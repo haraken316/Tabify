@@ -1,0 +1,84 @@
+﻿<Window x:Class="Tabify.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Tabify" Height="600" Width="800"
+        Background="Transparent"
+        AllowsTransparency="True"
+        WindowStyle="None"
+        Closing="Window_Closing"
+        LocationChanged="Window_LocationChanged"
+        SizeChanged="Window_SizeChanged">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="5" GlassFrameThickness="0"/>
+    </WindowChrome.WindowChrome>
+
+    <Border Background="#1e1e1e" BorderBrush="#3d3d3d" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="42"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- タブバー背景（ここをドラッグで Tabify 移動） -->
+            <Border x:Name="TabBarBg" Grid.Row="0" Background="#2d2d30"
+                    MouseLeftButtonDown="TabBarBg_MouseLeftButtonDown">
+                <Grid>
+                    <Border x:Name="DropHighlight" Background="#2a579a" Opacity="0" IsHitTestVisible="False"/>
+                    
+                    <DockPanel LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                            <TextBlock x:Name="DropHintText" 
+                                       Text="ここにウィンドウをドロップして追加"
+                                       Foreground="Gray" FontSize="11"
+                                       Margin="15,0,0,0" IsHitTestVisible="False"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- カスタムキャプションボタン（右端） -->
+                        <StackPanel x:Name="CaptionButtons" DockPanel.Dock="Right"
+                                    Orientation="Horizontal" VerticalAlignment="Stretch">
+                            <Border x:Name="BtnMinimize" Width="46" Cursor="Hand"
+                                    Background="Transparent"
+                                    MouseLeftButtonDown="CaptionBtn_Down"
+                                    MouseLeftButtonUp="BtnMinimize_Click"
+                                    MouseEnter="CaptionBtn_Enter" MouseLeave="CaptionBtn_Leave">
+                                <TextBlock Text="&#x2014;" FontSize="11" Foreground="#cccccc"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <Border x:Name="BtnMaximize" Width="46" Cursor="Hand"
+                                    Background="Transparent"
+                                    MouseLeftButtonDown="CaptionBtn_Down"
+                                    MouseLeftButtonUp="BtnMaximize_Click"
+                                    MouseEnter="CaptionBtn_Enter" MouseLeave="CaptionBtn_Leave">
+                                <TextBlock x:Name="MaximizeIcon" Text="&#x25A1;" FontSize="11" Foreground="#cccccc"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <Border x:Name="BtnClose" Width="46" Cursor="Hand"
+                                    Background="Transparent"
+                                    MouseLeftButtonDown="CaptionBtn_Down"
+                                    MouseLeftButtonUp="BtnClose_Click"
+                                    MouseEnter="CloseBtn_Enter" MouseLeave="CaptionBtn_Leave">
+                                <TextBlock Text="&#x2715;" FontSize="11" Foreground="#cccccc"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </StackPanel>
+                    </DockPanel>
+                </Grid>
+            </Border>
+
+            <!-- タブヘッダー Canvas（Margin 右を調整してキャプションボタンを避ける） -->
+            <Canvas x:Name="TabBar" Grid.Row="0" Background="{x:Null}"
+                    MouseMove="TabBar_MouseMove"
+                    MouseLeftButtonUp="TabBar_MouseLeftButtonUp"
+                    SizeChanged="TabBar_SizeChanged"
+                    Margin="0,0,138,0" IsHitTestVisible="True"/>
+
+            <!-- アタッチウィンドウ配置エリア -->
+            <Border x:Name="ContentArea" Grid.Row="1" Background="#1e1e1e" Margin="4,0,4,4"/>
+        </Grid>
+    </Border>
+</Window>

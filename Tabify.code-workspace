@@ -1,0 +1,23 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		// ここにAIエージェント（お使いの拡張機能）の設定を追加すると、このプロジェクト専用になります。
+		// ■ Antigravity (Google AI Pro 有償版) のモデル設定
+		// 使用したいモデルの先頭の `// ` を削除して有効化してください。（有効にするのは1つだけにしてください）
+		// Gemini 3.1 Pro (high)
+		//"antigravity.model": "gemini-3.1-pro-high",
+		// Gemini 3.1 Pro (low)
+		//"antigravity.model": "gemini-3.1-pro-low",
+		// Claude 4.6 Sonnet
+		//"antigravity.model": "claude-4.6-sonnet",
+		// Claude 4.6 Opus
+		//"antigravity.model": "claude-4.6-opus",
+		// GPT-OSS 120B
+		"antigravity.model": "gpt-oss-120b",
+		// その他必要なプロジェクト固有の設定があればここに記述します。
+	}
+}

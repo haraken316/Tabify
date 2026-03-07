@@ -367,7 +367,7 @@ namespace Tabify
             border.ContextMenu = ctx;
 
             // アタッチ後すぐにアクティブ用のスタイル設定
-            if (_tabs.Count == 0) ApplyActiveStyle(tab.Header, true);
+            if (_tabs.Count == 0) ApplyActiveStyle(border, true);
 
             return border;
         }
@@ -375,7 +375,7 @@ namespace Tabify
         // アクティブなタブのUIスタイルを適用（区切り線を消す・色を変える）
         private void ApplyActiveStyle(Border tabHeader, bool isActive)
         {
-            if (tabHeader.Child is Grid grid)
+            if (tabHeader?.Child is Grid grid)
             {
                 if (grid.Children[0] is Border inner)
                     inner.Background = new SolidColorBrush(isActive ? Color.FromRgb(0x4a, 0x4a, 0x4a) : Colors.Transparent);

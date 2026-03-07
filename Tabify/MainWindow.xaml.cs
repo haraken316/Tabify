@@ -147,9 +147,13 @@ namespace Tabify
             {
                 try
                 {
-                    var local = TitleBarBg.PointFromScreen(new Point(pt.X, pt.Y));
-                    bool isOver = local.X >= 0 && local.X <= TitleBarBg.ActualWidth &&
-                                  local.Y >= 0 && local.Y <= TitleBarBg.ActualHeight;
+                    var ptLocalTitleBar = TitleBarBg.PointFromScreen(new Point(pt.X, pt.Y));
+                    var ptLocalTabBar = TabBarContainer.PointFromScreen(new Point(pt.X, pt.Y));
+
+                    bool isOver = (ptLocalTitleBar.X >= 0 && ptLocalTitleBar.X <= TitleBarBg.ActualWidth &&
+                                   ptLocalTitleBar.Y >= 0 && ptLocalTitleBar.Y <= TitleBarBg.ActualHeight) ||
+                                  (ptLocalTabBar.X >= 0 && ptLocalTabBar.X <= TabBarContainer.ActualWidth &&
+                                   ptLocalTabBar.Y >= 0 && ptLocalTabBar.Y <= TabBarContainer.ActualHeight);
                     UpdateHighlight(isOver ? 0.6 : 0);
                 }
                 catch { UpdateHighlight(0); }
@@ -185,9 +189,17 @@ namespace Tabify
                 {
                     try
                     {
-                        var local = TitleBarBg.PointFromScreen(new Point(pt.X, pt.Y));
-                        if (local.X >= 0 && local.X <= TitleBarBg.ActualWidth &&
-                            local.Y >= 0 && local.Y <= TitleBarBg.ActualHeight)
+                        var ptLocalTitleBar = TitleBarBg.PointFromScreen(new Point(pt.X, pt.Y));
+                        var ptLocalTabBar = TabBarContainer.PointFromScreen(new Point(pt.X, pt.Y));
+                        
+                        // タイトルバー、またはタブバーエリア内のドロップならアタッチ
+                        bool isOverTitleBar = ptLocalTitleBar.X >= 0 && ptLocalTitleBar.X <= TitleBarBg.ActualWidth &&
+                                              ptLocalTitleBar.Y >= 0 && ptLocalTitleBar.Y <= TitleBarBg.ActualHeight;
+                        
+                        bool isOverTabBar = ptLocalTabBar.X >= 0 && ptLocalTabBar.X <= TabBarContainer.ActualWidth &&
+                                            ptLocalTabBar.Y >= 0 && ptLocalTabBar.Y <= TabBarContainer.ActualHeight;
+
+                        if (isOverTitleBar || isOverTabBar)
                             AttachWindow(hwnd);
                     }
                     catch { }
@@ -248,6 +260,7 @@ namespace Tabify
                 _tabs.Add(tab);
                 TabBar.Children.Add(tab.Header);
                 DropHintText.Visibility = Visibility.Collapsed;
+                DropHintTextCenter.Visibility = Visibility.Collapsed;
 
                 RecalcTabWidths(animate: false);
                 SelectTab(_tabs.Count - 1);
@@ -271,9 +284,9 @@ namespace Tabify
             var img = new Image
             {
                 Source = tab.Icon,
-                Width = 16, Height = 16,
-                Margin = new Thickness(0, 0, 6, 0),
-                VerticalAlignment = VerticalAlignment.Center
+                Width = 24, Height = 24,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
             };
 
             tab.TitleText = new TextBlock
@@ -422,12 +435,12 @@ namespace Tabify
             double space = availableSpace - scrollBtnSize - 10;
             double idealSize = space / _tabs.Count;
             
-            // 垂直（左右メニュー）時は横幅をアイコン分（例:42px）に固定し、縦幅を広げることはしない（TabH=36固定）
-            double targetW = IsVertical ? 42.0 : Math.Max(MinTabW, Math.Min(MaxTabW, idealSize));
-            double targetH = IsVertical ? TabH : TabH; // 縦レイアウトでも１タブの高さは36で固定（理想とするならば）
+            // 垂直（左右メニュー）時は横幅・縦幅ともに広げてアイコンを目立たせる (例:60x60)
+            double targetW = IsVertical ? 60.0 : Math.Max(MinTabW, Math.Min(MaxTabW, idealSize));
+            double targetH = IsVertical ? 60.0 : TabH;
 
             // 垂直レイアウト時は理想高さではなく、全体スペースに収まるか（溢れるか）を判定する
-            bool needsScroll = IsVertical ? (TabH * _tabs.Count > space) : (idealSize < MinTabW);
+            bool needsScroll = IsVertical ? (targetH * _tabs.Count > space) : (idealSize < MinTabW);
 
             if (needsScroll && !_isScrollMode)
             {
@@ -464,11 +477,23 @@ namespace Tabify
 
                 // テキスト・閉じるボタンの表示制御
                 t.TitleText.Visibility = IsVertical ? Visibility.Collapsed : Visibility.Visible;
-                if (t.Header.Child is Grid grid && grid.Children.Count > 0 && grid.Children[0] is Border inner && inner.Child is StackPanel stack && stack.Children.Count > 0)
+                if (t.Header.Child is Grid grid && grid.Children.Count > 0 && grid.Children[0] is Border inner && inner.Child is StackPanel stack)
                 {
-                    var closeBtn = stack.Children[stack.Children.Count - 1];
-                    closeBtn.Visibility = IsVertical ? Visibility.Collapsed : Visibility.Visible;
-                    inner.Padding = IsVertical ? new Thickness(12, 0, 0, 0) : new Thickness(8, 0, 4, 0);
+                    if (stack.Children.Count >= 3)
+                    {
+                        var iconImg = stack.Children[0] as Image;
+                        if (iconImg != null)
+                        {
+                            iconImg.Margin = IsVertical ? new Thickness(0) : new Thickness(0, 0, 6, 0);
+                            iconImg.Width = IsVertical ? 24 : 16;
+                            iconImg.Height = IsVertical ? 24 : 16;
+                        }
+                        
+                        var closeBtn = stack.Children[stack.Children.Count - 1];
+                        closeBtn.Visibility = IsVertical ? Visibility.Collapsed : Visibility.Visible;
+                    }
+                    inner.Padding = IsVertical ? new Thickness(0) : new Thickness(8, 0, 4, 0);
+                    inner.HorizontalAlignment = IsVertical ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
                 }
                 
                 if (!IsVertical && t.TitleText != null) 
@@ -535,7 +560,8 @@ namespace Tabify
             var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
             for (int i = 0; i < _tabs.Count; i++)
             {
-                double posVal = i * ((IsVertical ? TabH : _tabW) + TabGap) + 2 - _tabScrollOffset;
+                double currentTabH = IsVertical ? 60.0 : TabH;
+                double posVal = i * ((IsVertical ? currentTabH : _tabW) + TabGap) + 2 - _tabScrollOffset;
                 
                 if (IsVertical)
                 {
@@ -607,18 +633,25 @@ namespace Tabify
                 _dragGhostWindow.Top = screenPos.Y - (IsVertical ? _dragOffsetX : 10);
                 return; // 通常のタブ挿入アニメーションは行わない
             }
-            else
+            // エリア内に戻ってきたらゴーストを消して元に戻す
+            if (_dragGhostWindow != null)
             {
-                // エリア内に戻ってきたらゴーストを消して元に戻す
-                if (_dragGhostWindow != null)
-                {
-                    _dragGhostWindow.Close();
-                    _dragGhostWindow = null;
-                    _dragTab.Header.Visibility = Visibility.Visible;
-                }
+                _dragGhostWindow.Close();
+                _dragGhostWindow = null;
+                _dragTab.Header.Visibility = Visibility.Visible;
             }
 
-            double itemSize = IsVertical ? TabH : _tabW;
+            // アニメーションのロックを解除して手動移動できるようにする
+            if (IsVertical)
+            {
+                _dragTab.Header.BeginAnimation(Canvas.TopProperty, null);
+            }
+            else
+            {
+                _dragTab.Header.BeginAnimation(Canvas.LeftProperty, null);
+            }
+
+            double itemSize = IsVertical ? 60.0 : _tabW;
             double itemOffset = IsVertical ? pos.Y : pos.X;
             double minPos = 2;
             double maxPos = 2 + (_tabs.Count - 1) * (itemSize + TabGap);
@@ -682,7 +715,7 @@ namespace Tabify
         private void AnimateSlots()
         {
             int dragFrom = _tabs.IndexOf(_dragTab);
-            double itemSize = IsVertical ? TabH : _tabW;
+            double itemSize = IsVertical ? 60.0 : _tabW;
             for (int i = 0; i < _tabs.Count; i++)
             {
                 if (_tabs[i] == _dragTab) continue;
@@ -800,7 +833,7 @@ namespace Tabify
                     TabScrollRight.Margin = new Thickness(28, 0, 0, 0);
                     break;
                 case "左側 (Left)":
-                    ColLeft.Width = new GridLength(42);
+                    ColLeft.Width = new GridLength(60);
                     Grid.SetRow(TabBarContainer, 1);
                     Grid.SetColumn(TabBarContainer, 0);
                     Grid.SetColumnSpan(TabBarContainer, 1);
@@ -817,7 +850,7 @@ namespace Tabify
                     TabScrollRight.Margin = new Thickness(0, 28, 0, 0);
                     break;
                 case "右側 (Right)":
-                    ColRight.Width = new GridLength(42);
+                    ColRight.Width = new GridLength(60);
                     Grid.SetRow(TabBarContainer, 1);
                     Grid.SetColumn(TabBarContainer, 2);
                     Grid.SetColumnSpan(TabBarContainer, 1);
@@ -894,7 +927,15 @@ namespace Tabify
 
             NativeMethods.GetCursorPos(out var pt);
             NativeMethods.SetWindowPos(hWnd, IntPtr.Zero, pt.X - 100, pt.Y - 10, 800, 600, NativeMethods.SWP_SHOWWINDOW | NativeMethods.SWP_FRAMECHANGED);
-            if (_tabs.Count > 0) SelectTab(0); else DropHintText.Visibility = Visibility.Visible;
+            if (_tabs.Count > 0)
+            {
+                SelectTab(0);
+            }
+            else
+            {
+                DropHintText.Visibility = Visibility.Visible;
+                DropHintTextCenter.Visibility = Visibility.Visible;
+            }
             RecalcTabWidths();
             LayoutTabs();
         }
@@ -1025,8 +1066,15 @@ namespace Tabify
         private async void ShowDropHintTemporary(string msg)
         {
             var old = DropHintText.Text; DropHintText.Text = msg; DropHintText.Visibility = Visibility.Visible;
+            var oldCenter = DropHintTextCenter.Text; DropHintTextCenter.Text = msg; DropHintTextCenter.Visibility = Visibility.Visible;
+            
             await System.Threading.Tasks.Task.Delay(3000);
-            DropHintText.Text = old; DropHintText.Visibility = _tabs.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+            
+            DropHintText.Text = old; 
+            DropHintText.Visibility = _tabs.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+            
+            DropHintTextCenter.Text = oldCenter;
+            DropHintTextCenter.Visibility = _tabs.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
         }
     }
 }

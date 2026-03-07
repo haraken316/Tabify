@@ -30,7 +30,13 @@
             </Grid.ColumnDefinitions>
 
             <!-- アタッチウィンドウ配置エリア（常に中央） -->
-            <Border x:Name="ContentArea" Grid.Row="1" Grid.Column="1" Background="#1e1e1e" Margin="4,0,4,4"/>
+            <Border x:Name="ContentArea" Grid.Row="1" Grid.Column="1" Background="#1e1e1e" Margin="4,0,4,4">
+                <TextBlock x:Name="DropHintTextCenter"
+                           Text="ここにウィンドウをドロップして追加"
+                           Foreground="DimGray" FontSize="18"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           IsHitTestVisible="False"/>
+            </Border>
 
             <!-- 共通タイトルバー（上部固定・ドラッグ可能・キャプションボタンあり） -->
             <Border x:Name="TitleBarBg" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Background="#2d2d30" MouseLeftButtonDown="TabBarBg_MouseLeftButtonDown">

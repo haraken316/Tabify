@@ -1,0 +1,4 @@
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at Tabify.MainWindow.ApplyActiveStyle(Border tabHeader, Boolean isActive) in C:\Users\harak\Documents\MyGit\work\20260301-likeGroupy\Tabify\MainWindow.xaml.cs:line 379
+   at Tabify.MainWindow.BuildTabHeader(TabData tab) in C:\Users\harak\Documents\MyGit\work\20260301-likeGroupy\Tabify\MainWindow.xaml.cs:line 371
+   at Tabify.MainWindow.AttachWindow(IntPtr hWnd) in C:\Users\harak\Documents\MyGit\work\20260301-likeGroupy\Tabify\MainWindow.xaml.cs:line 243

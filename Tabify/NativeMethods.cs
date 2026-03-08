@@ -136,5 +136,10 @@ namespace Tabify
 
         // 描画不具合対策用
         public const int SW_MINIMIZE = 6;
+
+        [DllImport("dwmapi.dll", PreserveSig = true)]
+        public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+        public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
     }
 }

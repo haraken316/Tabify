@@ -16,7 +16,7 @@
         <WindowChrome CaptionHeight="0" ResizeBorderThickness="5" GlassFrameThickness="0"/>
     </WindowChrome.WindowChrome>
 
-    <Border Background="#1e1e1e" BorderBrush="#3d3d3d" BorderThickness="1">
+    <Border x:Name="WindowBorder" Background="#1e1e1e" BorderBrush="#3d3d3d" BorderThickness="1">
         <Grid x:Name="RootGrid">
             <Grid.RowDefinitions>
                 <RowDefinition x:Name="RowTop" Height="42"/>
@@ -105,7 +105,7 @@
             </Border>
 
             <!-- 動的配置されるタブバーコンテナ -->
-            <Border x:Name="TabBarContainer" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Background="{x:Null}" Margin="0,0,180,0">
+            <Border x:Name="TabBarContainer" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Background="{x:Null}" Margin="0,0,180,0" MouseLeftButtonDown="TabBarBg_MouseLeftButtonDown">
                 <Grid>
                     <Border x:Name="DropHighlight" Background="#2a579a" Opacity="0" IsHitTestVisible="False"/>
 

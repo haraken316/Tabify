@@ -9,6 +9,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using Microsoft.Win32;
 
 namespace Tabify
 {
@@ -50,6 +51,7 @@ namespace Tabify
         private TabData _dragTab;
         private int _dragInsertIndex;
         private double _dragOffsetX;
+        private double _dragOffsetY;
         private bool _isDraggingTab;
         private Point _dragStartPoint;
         private const double DragThreshold = 5.0;
@@ -79,13 +81,11 @@ namespace Tabify
         // =====================================================================
         public MainWindow()
         {
-            InitializeComponent();
+            InitializeComponent();            _syncTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
+            _syncTimer.Tick += (_, _) => { if (!_isWindowMoving) SyncActiveWindow(); }; // Re-added this line as it was implicitly removed by the snippet
+            _syncTimer.Start(); // Re-added this line as it was implicitly removed by the snippet
 
-            _syncTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
-            _syncTimer.Tick += (_, _) => { if (!_isWindowMoving) SyncActiveWindow(); };
-            _syncTimer.Start();
-
-            _highlightTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+            _highlightTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) }; // Original interval
             _highlightTimer.Tick += HighlightTimer_Tick;
 
             _winEventProc = WinEventProc;
@@ -97,6 +97,11 @@ namespace Tabify
 
             Activated += (_, _) => BringSelectedToFront();
             StateChanged += (_, _) => UpdateMaximizeIcon();
+
+            SystemEvents.UserPreferenceChanged += (s, ev) => {
+                if (ev.Category == UserPreferenceCategory.General || ev.Category == UserPreferenceCategory.Color)
+                    ApplyTheme();
+            };
         }
 
         // WndProc フック
@@ -105,6 +110,64 @@ namespace Tabify
             base.OnSourceInitialized(e);
             if (PresentationSource.FromVisual(this) is HwndSource src)
                 src.AddHook(WndProcHook);
+                
+            ApplyTheme();
+        }
+
+        private void ApplyTheme()
+        {
+            bool isDark = true;
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+                if (key != null && key.GetValue("AppsUseLightTheme") is int lightMode)
+                    isDark = (lightMode == 0);
+            }
+            catch { }
+
+            // タイトルバー等のDWMダークモード指定
+            var hwnd = new WindowInteropHelper(this).EnsureHandle();
+            int darkMode = isDark ? 1 : 0;
+            NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkMode, sizeof(int));
+
+            // テーマに合わせて背景色と文字色を変える
+            var bgBrush = new SolidColorBrush(isDark ? Color.FromRgb(0x1e, 0x1e, 0x1e) : Color.FromRgb(0xf3, 0xf3, 0xf3));
+            var titleBrush = new SolidColorBrush(isDark ? Color.FromRgb(0x2d, 0x2d, 0x30) : Color.FromRgb(0xe8, 0xe8, 0xe8));
+            var textBrush = isDark ? Brushes.White : Brushes.Black;
+            var hintBrush = isDark ? Brushes.Gray : Brushes.DarkGray;
+            
+            ContentArea.Background = bgBrush;
+            TitleBarBg.Background = titleBrush;
+            TabBarContainer.Background = titleBrush;
+            RootGrid.Background = bgBrush;
+            DropHintText.Foreground = hintBrush;
+            DropHintTextCenter.Foreground = hintBrush;
+            WindowBorder.BorderBrush = SystemParameters.WindowGlassBrush;
+
+            // アイコンの色を反転 (Light mode なら黒、Dark なら白系のグレー)
+            var iconColor = isDark ? Color.FromRgb(0xcc, 0xcc, 0xcc) : Color.FromRgb(0x22, 0x22, 0x22);
+            var iconBrush = new SolidColorBrush(iconColor);
+            ((TextBlock)BtnAttachAll.Child).Foreground = iconBrush;
+            ((TextBlock)BtnSettings.Child).Foreground = iconBrush;
+            ((TextBlock)BtnMinimize.Child).Foreground = iconBrush;
+            MaximizeIcon.Foreground = iconBrush;
+            ((TextBlock)BtnClose.Child).Foreground = iconBrush;
+            ((TextBlock)TabScrollLeft.Child).Foreground = iconBrush;
+            ((TextBlock)TabScrollRight.Child).Foreground = iconBrush;
+            
+            foreach (var tab in _tabs)
+            {
+                tab.TitleText.Foreground = textBrush;
+                if (tab.Header.Child is Grid grid && grid.Children.Count > 0 && grid.Children[0] is Border inner && inner.Child is StackPanel stack)
+                {
+                    if (stack.Children.Count >= 3)
+                    {
+                        var closeBtn = stack.Children[stack.Children.Count - 1] as Border;
+                        if (closeBtn != null && closeBtn.Child is TextBlock cbText)
+                            cbText.Foreground = iconBrush;
+                    }
+                }
+            }
         }
 
         private IntPtr WndProcHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -210,6 +273,33 @@ namespace Tabify
             }
         }
 
+        public void ForceAttach(IntPtr hWnd, string title, ImageSource icon)
+        {
+            try
+            {
+                foreach (var t in _tabs) if (t.HWnd == hWnd) return;
+
+                var tab = new TabData { HWnd = hWnd, Title = title, Icon = icon };
+                tab.Header = BuildTabHeader(tab);
+                tab.Header.RenderTransform = tab.Shift;
+                
+                foreach (var t in _tabs) NativeMethods.ShowWindow(t.HWnd, NativeMethods.SW_HIDE);
+                
+                _tabs.Add(tab);
+                TabBar.Children.Add(tab.Header);
+                DropHintText.Visibility = Visibility.Collapsed;
+                DropHintTextCenter.Visibility = Visibility.Collapsed;
+
+                RecalcTabWidths(animate: false);
+                SelectTab(_tabs.Count - 1);
+                LayoutTabs(animate: false);
+
+                ApplyTheme();
+                SyncActiveWindow();
+            }
+            catch { }
+        }
+
         private async void AttachWindow(IntPtr hWnd)
         {
             try
@@ -222,12 +312,12 @@ namespace Tabify
                     return;
                 }
 
-                // ⭐ [バグ修正] エクスプローラーやシステムウィンドウを引き込むとクラッシュするため拒否
+                // ⭐ [バグ修正] デスクトップそのもの（Progman, WorkerW）とタスクバー（Shell_TrayWnd）のみ弾き、
+                // エクスプローラー（CabinetWClass / ExploreWClass）の統合制限は解除する
                 string className = GetClassName(hWnd);
-                if (className == "CabinetWClass" || className == "ExploreWClass" || 
-                    className == "Progman" || className == "WorkerW" || className == "Shell_TrayWnd")
+                if (className == "Progman" || className == "WorkerW" || className == "Shell_TrayWnd")
                 {
-                    ShowDropHintTemporary("⚠ システムウィンドウ(Explorer等)は統合できません");
+                    ShowDropHintTemporary("⚠ システムデスクトップやタスクバーは統合できません");
                     return;
                 }
 
@@ -266,12 +356,16 @@ namespace Tabify
                 SelectTab(_tabs.Count - 1);
                 LayoutTabs(animate: false);
 
+                ApplyTheme();
+
                 SyncActiveWindow();
             }
             catch (Exception ex)
             {
+                System.IO.File.WriteAllText(@"C:\Users\harak\Documents\MyGit\work\20260301-likeGroupy\attach_error.log", ex.ToString());
                 System.Diagnostics.Debug.WriteLine($"AttachWindow Error: {ex.Message}");
-                ShowDropHintTemporary("⚠ ウィンドウの統合に失敗しました");
+                // UIに直接例外の中身を表示してユーザーから情報を得る
+                ShowDropHintTemporary($"⚠ 統合失敗(Exception):\n{ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -391,8 +485,19 @@ namespace Tabify
             if (tabHeader?.Child is Grid grid)
             {
                 if (grid.Children[0] is Border inner)
-                    inner.Background = new SolidColorBrush(isActive ? Color.FromRgb(0x4a, 0x4a, 0x4a) : Colors.Transparent);
-                if (grid.Children[1] is Border sep)
+                {
+                    bool isDark = true;
+                    try
+                    {
+                        using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+                        if (key != null && key.GetValue("AppsUseLightTheme") is int lightMode)
+                            isDark = (lightMode == 0);
+                    } catch {}
+                    
+                    var activeColor = isDark ? Color.FromRgb(0x4a, 0x4a, 0x4a) : Color.FromRgb(0xd0, 0xd0, 0xd0);
+                    inner.Background = new SolidColorBrush(isActive ? activeColor : Colors.Transparent);
+                }
+                if (grid.Children.Count > 1 && grid.Children[1] is Border sep)
                     sep.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
             }
         }
@@ -453,7 +558,7 @@ namespace Tabify
                 if (IsVertical)
                     TabBar.Margin = new Thickness(0, 56, 0, 0); // 下にスクロール余白を広げる
                 else
-                    TabBar.Margin = new Thickness(56, 0, _tabPlacement == "上側 (Top)" ? 180 : 10, 0);
+                    TabBar.Margin = new Thickness(56, 0, _tabPlacement == "上側 (Top)" ? 230 : 10, 0);
                     
                 space = (IsVertical ? TabBar.ActualHeight : TabBar.ActualWidth) - 10;
             }
@@ -463,7 +568,7 @@ namespace Tabify
                 _tabScrollOffset = 0;
                 TabScrollLeft.Visibility = Visibility.Collapsed;
                 TabScrollRight.Visibility = Visibility.Collapsed;
-                TabBar.Margin = new Thickness(0, 0, _tabPlacement == "上側 (Top)" && !IsVertical ? 180 : 0, 0);
+                TabBar.Margin = new Thickness(0, 0, _tabPlacement == "上側 (Top)" && !IsVertical ? 230 : 0, 0);
             }
 
             if (Math.Abs(targetW - _tabW) >= 0.5) _tabW = targetW;
@@ -473,7 +578,10 @@ namespace Tabify
                 if (animate)
                     t.Header.BeginAnimation(WidthProperty, new DoubleAnimation(_tabW, TimeSpan.FromMilliseconds(IsVertical ? 0 : 150)));
                 else
+                {
+                    t.Header.BeginAnimation(WidthProperty, null);
                     t.Header.Width = _tabW;
+                }
 
                 // テキスト・閉じるボタンの表示制御
                 t.TitleText.Visibility = IsVertical ? Visibility.Collapsed : Visibility.Visible;
@@ -492,9 +600,14 @@ namespace Tabify
                         var closeBtn = stack.Children[stack.Children.Count - 1];
                         closeBtn.Visibility = IsVertical ? Visibility.Collapsed : Visibility.Visible;
                     }
+                    stack.HorizontalAlignment = IsVertical ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
                     inner.Padding = IsVertical ? new Thickness(0) : new Thickness(8, 0, 4, 0);
-                    inner.HorizontalAlignment = IsVertical ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+                    inner.Margin = IsVertical ? new Thickness(4) : new Thickness(0);
+                    inner.HorizontalAlignment = HorizontalAlignment.Stretch;
+                    inner.VerticalAlignment = IsVertical ? VerticalAlignment.Stretch : VerticalAlignment.Center;
                 }
+                
+                t.Header.Height = IsVertical ? 60.0 : TabH;
                 
                 if (!IsVertical && t.TitleText != null) 
                     t.TitleText.MaxWidth = Math.Max(10, _tabW - 56);
@@ -560,24 +673,35 @@ namespace Tabify
             var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
             for (int i = 0; i < _tabs.Count; i++)
             {
+                Canvas.SetZIndex(_tabs[i].Header, 0); // 重なりバグを防ぐためZIndexを常にリセット
                 double currentTabH = IsVertical ? 60.0 : TabH;
                 double posVal = i * ((IsVertical ? currentTabH : _tabW) + TabGap) + 2 - _tabScrollOffset;
                 
                 if (IsVertical)
                 {
+                    // 横方向のアニメーションをクリアしてから適用
+                    _tabs[i].Header.BeginAnimation(Canvas.LeftProperty, null);
                     Canvas.SetLeft(_tabs[i].Header, 0);
                     if (animate)
                         _tabs[i].Header.BeginAnimation(Canvas.TopProperty, new DoubleAnimation { To = posVal, Duration = dur, EasingFunction = ease });
                     else
+                    {
+                        _tabs[i].Header.BeginAnimation(Canvas.TopProperty, null);
                         Canvas.SetTop(_tabs[i].Header, posVal);
+                    }
                 }
                 else
                 {
+                    // 縦方向のアニメーションをクリアしてから適用
+                    _tabs[i].Header.BeginAnimation(Canvas.TopProperty, null);
                     Canvas.SetTop(_tabs[i].Header, 2);
                     if (animate)
                         _tabs[i].Header.BeginAnimation(Canvas.LeftProperty, new DoubleAnimation { To = posVal, Duration = dur, EasingFunction = ease });
                     else
+                    {
+                        _tabs[i].Header.BeginAnimation(Canvas.LeftProperty, null);
                         Canvas.SetLeft(_tabs[i].Header, posVal);
+                    }
                 }
             }
         }
@@ -592,6 +716,7 @@ namespace Tabify
                 _dragTab = tab;
                 _dragStartPoint = e.GetPosition(TabBar);
                 _dragOffsetX = e.GetPosition(b).X;
+                _dragOffsetY = e.GetPosition(b).Y;
                 _dragInsertIndex = _tabs.IndexOf(tab);
                 _isDraggingTab = false;
                 b.CaptureMouse();
@@ -618,19 +743,29 @@ namespace Tabify
             {
                 if (_dragGhostWindow == null)
                 {
-                    _dragTab.Header.Visibility = Visibility.Hidden;
+                    // Render the original tab at 100% opacity before we hide it
+                    var bmp = new System.Windows.Media.Imaging.RenderTargetBitmap(
+                        (int)_dragTab.Header.ActualWidth, (int)_dragTab.Header.ActualHeight, 
+                        96, 96, PixelFormats.Pbgra32);
+                    bmp.Render(_dragTab.Header);
+
+                    // Visibility.Hidden drops mouse capture in WPF, breaking the detach drag event.
+                    _dragTab.Header.Opacity = 0.01;
                     _dragGhostWindow = new Window
                     {
                         WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = Brushes.Transparent, Topmost = true, ShowInTaskbar = false,
-                        Width = _tabW, Height = TabH, Opacity = 0.8,
-                        Content = new Border { Background = new VisualBrush(_dragTab.Header) { Stretch = Stretch.None } }
+                        ShowActivated = false, // ゴーストウィンドウが生成時にフォーカスを奪ってドラッグが強制終了するのを防ぐ
+                        Width = _dragTab.Header.ActualWidth, Height = _dragTab.Header.ActualHeight, Opacity = 0.8,
+                        Content = new Border { Background = new ImageBrush(bmp) { Stretch = Stretch.None } }
                     };
                     _dragGhostWindow.Show();
                 }
 
-                var screenPos = TabBar.PointToScreen(pos);
-                _dragGhostWindow.Left = screenPos.X - (IsVertical ? 0 : _dragOffsetX);
-                _dragGhostWindow.Top = screenPos.Y - (IsVertical ? _dragOffsetX : 10);
+                if (NativeMethods.GetCursorPos(out var pt))
+                {
+                    _dragGhostWindow.Left = pt.X - (IsVertical ? 0 : _dragOffsetX);
+                    _dragGhostWindow.Top = pt.Y - (IsVertical ? _dragOffsetX : 10);
+                }
                 return; // 通常のタブ挿入アニメーションは行わない
             }
             // エリア内に戻ってきたらゴーストを消して元に戻す
@@ -638,7 +773,7 @@ namespace Tabify
             {
                 _dragGhostWindow.Close();
                 _dragGhostWindow = null;
-                _dragTab.Header.Visibility = Visibility.Visible;
+                _dragTab.Header.Opacity = 1.0;
             }
 
             // アニメーションのロックを解除して手動移動できるようにする
@@ -653,14 +788,23 @@ namespace Tabify
 
             double itemSize = IsVertical ? 60.0 : _tabW;
             double itemOffset = IsVertical ? pos.Y : pos.X;
+            double dragBaseOffset = IsVertical ? _dragOffsetY : _dragOffsetX;
+
             double minPos = 2;
             double maxPos = 2 + (_tabs.Count - 1) * (itemSize + TabGap);
-            double newPos = Math.Max(minPos, Math.Min(maxPos, itemOffset - _dragOffsetX));
+            double newPos = Math.Max(minPos, Math.Min(maxPos, itemOffset - dragBaseOffset));
 
+            // [要件3] ドラッグ中はX軸・Y軸の両方でマウスに追従させ、切り離し判定を視覚的に分かりやすくする
             if (IsVertical)
+            {
                 Canvas.SetTop(_dragTab.Header, newPos);
+                Canvas.SetLeft(_dragTab.Header, pos.X - _dragOffsetX);
+            }
             else
+            {
                 Canvas.SetLeft(_dragTab.Header, newPos);
+                Canvas.SetTop(_dragTab.Header, pos.Y - _dragOffsetY);
+            }
 
             int newIns = (int)((newPos - 2 + itemSize / 2) / (itemSize + TabGap));
             newIns = Math.Max(0, Math.Min(_tabs.Count - 1, newIns));
@@ -670,6 +814,7 @@ namespace Tabify
         private void TabBar_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             if (_dragTab == null) return;
+            bool isDragging = _isDraggingTab;
             _dragTab.Header.ReleaseMouseCapture();
 
             // ⭐ [要件5] ゴースト表示中（エリア外）でドロップされたら切り離す
@@ -677,15 +822,71 @@ namespace Tabify
             {
                 _dragGhostWindow.Close();
                 _dragGhostWindow = null;
-                _dragTab.Header.Visibility = Visibility.Visible;
+                _dragTab.Header.Opacity = 1.0;
                 
-                var targetTab = _dragTab; // 参照を保持
-                _dragTab = null;
-                _isDraggingTab = false;
-                
-                DetachTab(targetTab); 
-                e.Handled = true;
-                return;
+                if (isDragging)
+                {
+                    var targetTab = _dragTab;
+                    _dragTab = null;
+                    _isDraggingTab = false;
+                    e.Handled = true;
+
+                    if (NativeMethods.GetCursorPos(out var pt))
+                    {
+                        bool droppedOnOther = false;
+                        foreach (Window win in Application.Current.Windows)
+                        {
+                            if (win is MainWindow otherMain && otherMain != this)
+                            {
+                                try
+                                {
+                                    var ptLocal = otherMain.TabBarContainer.PointFromScreen(new Point(pt.X, pt.Y));
+                                    if (ptLocal.X >= 0 && ptLocal.Y >= 0 && ptLocal.X <= otherMain.TabBarContainer.ActualWidth && ptLocal.Y <= otherMain.TabBarContainer.ActualHeight)
+                                    {
+                                        // Transfer to the other Window (Snap back)
+                                        _tabs.Remove(targetTab);
+                                        TabBar.Children.Remove(targetTab.Header);
+                                        RecalcTabWidths();
+                                        LayoutTabs();
+
+                                        var otherHwnd = new WindowInteropHelper(otherMain).Handle;
+                                        NativeMethods.SetWindowLongPtr(targetTab.HWnd, NativeMethods.GWLP_HWNDPARENT, otherHwnd);
+                                        otherMain.ForceAttach(targetTab.HWnd, targetTab.Title, targetTab.Icon);
+                                        
+                                        droppedOnOther = true;
+                                        if (_tabs.Count == 0) this.Close();
+                                        break;
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+
+                        if (!droppedOnOther)
+                        {
+                            // Detach as NEW Tabify Window (Chrome behavior)
+                            _tabs.Remove(targetTab);
+                            TabBar.Children.Remove(targetTab.Header);
+                            RecalcTabWidths();
+                            LayoutTabs();
+
+                            var newWin = new MainWindow();
+                            var source = PresentationSource.FromVisual(this);
+                            double dpiX = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+                            double dpiY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+                            newWin.Left = pt.X / dpiX - 50;
+                            newWin.Top = pt.Y / dpiY - 20;
+                            newWin.Show();
+
+                            var newHwnd = new WindowInteropHelper(newWin).Handle;
+                            NativeMethods.SetWindowLongPtr(targetTab.HWnd, NativeMethods.GWLP_HWNDPARENT, newHwnd);
+                            newWin.ForceAttach(targetTab.HWnd, targetTab.Title, targetTab.Icon);
+
+                            if (_tabs.Count == 0) this.Close();
+                        }
+                    }
+                    return;
+                }
             }
 
             if (_isDraggingTab)
@@ -733,6 +934,12 @@ namespace Tabify
 
         private void TabBarBg_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            if (e.ClickCount == 2)
+            {
+                WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+                return;
+            }
+
             _isWindowMoving = true;
             try { DragMove(); }
             finally { _isWindowMoving = false; SyncActiveWindow(); }
@@ -803,7 +1010,7 @@ namespace Tabify
                     Grid.SetColumn(TabBarContainer, 0);
                     Grid.SetColumnSpan(TabBarContainer, 3);
                     Grid.SetRowSpan(TabBarContainer, 1);
-                    TabBarContainer.Margin = new Thickness(0, 0, 180, 0); // キャプションボタンを避ける
+                    TabBarContainer.Margin = new Thickness(0, 0, 230, 0); // キャプションボタンを避ける
                     
                     TabScrollLeft.Width = 28; TabScrollLeft.Height = double.NaN;
                     TabScrollLeft.HorizontalAlignment = HorizontalAlignment.Left;
@@ -883,6 +1090,12 @@ namespace Tabify
                 mi.Click += (s, ev) => ChangeTabPlacement(pos);
                 ctx.Items.Add(mi);
             }
+
+            ctx.Items.Add(new Separator());
+            var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
+            var verItem = new MenuItem { Header = $"Version: {version}", IsEnabled = false };
+            ctx.Items.Add(verItem);
+
             ctx.PlacementTarget = BtnSettings;
             ctx.IsOpen = true;
             e.Handled = true;

@@ -558,7 +558,7 @@ namespace Tabify
                 if (IsVertical)
                     TabBar.Margin = new Thickness(0, 56, 0, 0); // 下にスクロール余白を広げる
                 else
-                    TabBar.Margin = new Thickness(56, 0, _tabPlacement == "上側 (Top)" ? 230 : 10, 0);
+                    TabBar.Margin = new Thickness(56, 0, _tabPlacement == "上側 (Top)" ? 180 : 10, 0);
                     
                 space = (IsVertical ? TabBar.ActualHeight : TabBar.ActualWidth) - 10;
             }
@@ -568,7 +568,7 @@ namespace Tabify
                 _tabScrollOffset = 0;
                 TabScrollLeft.Visibility = Visibility.Collapsed;
                 TabScrollRight.Visibility = Visibility.Collapsed;
-                TabBar.Margin = new Thickness(0, 0, _tabPlacement == "上側 (Top)" && !IsVertical ? 230 : 0, 0);
+                TabBar.Margin = new Thickness(0, 0, _tabPlacement == "上側 (Top)" && !IsVertical ? 180 : 0, 0);
             }
 
             if (Math.Abs(targetW - _tabW) >= 0.5) _tabW = targetW;
@@ -1010,7 +1010,7 @@ namespace Tabify
                     Grid.SetColumn(TabBarContainer, 0);
                     Grid.SetColumnSpan(TabBarContainer, 3);
                     Grid.SetRowSpan(TabBarContainer, 1);
-                    TabBarContainer.Margin = new Thickness(0, 0, 230, 0); // キャプションボタンを避ける
+                    TabBarContainer.Margin = new Thickness(0, 0, 180, 0); // キャプションボタンを避ける
                     
                     TabScrollLeft.Width = 28; TabScrollLeft.Height = double.NaN;
                     TabScrollLeft.HorizontalAlignment = HorizontalAlignment.Left;

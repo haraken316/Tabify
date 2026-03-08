@@ -38,7 +38,46 @@
                            IsHitTestVisible="False"/>
             </Border>
 
+            <!-- 動的配置されるタブバーコンテナ -->
+            <Border x:Name="TabBarContainer" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Background="{x:Null}" Margin="0,0,180,0" MouseLeftButtonDown="TabBarBg_MouseLeftButtonDown">
+                <Grid>
+                    <Border x:Name="DropHighlight" Background="#2a579a" Opacity="0" IsHitTestVisible="False"/>
+
+                    <!-- タブスクロール ◀ ボタン（タブ溢れ時のみ表示） -->
+                    <Border x:Name="TabScrollLeft" Grid.Row="0"
+                            Width="28" Height="28" HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                            Background="#2d2d30" Visibility="Collapsed" Cursor="Hand"
+                            MouseLeftButtonUp="TabScrollLeft_Click"
+                            MouseEnter="CaptionBtn_Enter" MouseLeave="CaptionBtn_Leave"
+                            Margin="0">
+                        <TextBlock x:Name="TabScrollLeftIcon" Text="◀" FontSize="10" Foreground="#cccccc"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- タブスクロール ▶ ボタン（タブ溢れ時のみ表示） -->
+                    <Border x:Name="TabScrollRight" Grid.Row="0"
+                            Width="28" Height="28" VerticalAlignment="Stretch"
+                            Background="#2d2d30" Visibility="Collapsed" Cursor="Hand"
+                            MouseLeftButtonUp="TabScrollRight_Click"
+                            MouseEnter="CaptionBtn_Enter" MouseLeave="CaptionBtn_Leave"
+                            HorizontalAlignment="Left" Margin="28,0,0,0">
+                        <TextBlock x:Name="TabScrollRightIcon" Text="▶" FontSize="10" Foreground="#cccccc"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- タブヘッダー Canvas -->
+                    <Canvas x:Name="TabBar" Grid.Row="0" Background="{x:Null}"
+                            ClipToBounds="True"
+                            MouseMove="TabBar_MouseMove"
+                            MouseLeftButtonUp="TabBar_MouseLeftButtonUp"
+                            MouseWheel="TabBar_MouseWheel"
+                            SizeChanged="TabBar_SizeChanged"
+                            IsHitTestVisible="True"/>
+                </Grid>
+            </Border>
+
             <!-- 共通タイトルバー（上部固定・ドラッグ可能・キャプションボタンあり） -->
+            <!-- Z-Order: Rendered LAST so it sits on top of TabBarContainer, ensuring buttons don't get hidden -->
             <Border x:Name="TitleBarBg" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Background="#2d2d30" MouseLeftButtonDown="TabBarBg_MouseLeftButtonDown">
                 <DockPanel LastChildFill="False">
                     <!-- ヒントテキスト -->
@@ -102,44 +141,6 @@
                         </Border>
                     </StackPanel>
                 </DockPanel>
-            </Border>
-
-            <!-- 動的配置されるタブバーコンテナ -->
-            <Border x:Name="TabBarContainer" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Background="{x:Null}" Margin="0,0,180,0" MouseLeftButtonDown="TabBarBg_MouseLeftButtonDown">
-                <Grid>
-                    <Border x:Name="DropHighlight" Background="#2a579a" Opacity="0" IsHitTestVisible="False"/>
-
-                    <!-- タブスクロール ◀ ボタン（タブ溢れ時のみ表示） -->
-                    <Border x:Name="TabScrollLeft" Grid.Row="0"
-                            Width="28" Height="28" HorizontalAlignment="Left" VerticalAlignment="Stretch"
-                            Background="#2d2d30" Visibility="Collapsed" Cursor="Hand"
-                            MouseLeftButtonUp="TabScrollLeft_Click"
-                            MouseEnter="CaptionBtn_Enter" MouseLeave="CaptionBtn_Leave"
-                            Margin="0">
-                        <TextBlock x:Name="TabScrollLeftIcon" Text="◀" FontSize="10" Foreground="#cccccc"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-
-                    <!-- タブスクロール ▶ ボタン（タブ溢れ時のみ表示） -->
-                    <Border x:Name="TabScrollRight" Grid.Row="0"
-                            Width="28" Height="28" VerticalAlignment="Stretch"
-                            Background="#2d2d30" Visibility="Collapsed" Cursor="Hand"
-                            MouseLeftButtonUp="TabScrollRight_Click"
-                            MouseEnter="CaptionBtn_Enter" MouseLeave="CaptionBtn_Leave"
-                            HorizontalAlignment="Left" Margin="28,0,0,0">
-                        <TextBlock x:Name="TabScrollRightIcon" Text="▶" FontSize="10" Foreground="#cccccc"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-
-                    <!-- タブヘッダー Canvas -->
-                    <Canvas x:Name="TabBar" Grid.Row="0" Background="{x:Null}"
-                            ClipToBounds="True"
-                            MouseMove="TabBar_MouseMove"
-                            MouseLeftButtonUp="TabBar_MouseLeftButtonUp"
-                            MouseWheel="TabBar_MouseWheel"
-                            SizeChanged="TabBar_SizeChanged"
-                            IsHitTestVisible="True"/>
-                </Grid>
             </Border>
         </Grid>
     </Border>

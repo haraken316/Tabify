@@ -1,12 +1,11 @@
-﻿<Window x:Class="Tabify.MainWindow"
+<Window x:Class="Tabify.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="Tabify" Height="600" Width="800"
-        Background="Transparent"
-        AllowsTransparency="True"
+        Background="#1e1e1e"
         WindowStyle="None"
         Closing="Window_Closing"
         LocationChanged="Window_LocationChanged"
@@ -38,10 +37,17 @@
                            IsHitTestVisible="False"/>
             </Border>
 
-            <!-- 動的配置されるタブバーコンテナ -->
-            <Border x:Name="TabBarContainer" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Background="{x:Null}" Margin="0,0,180,0" MouseLeftButtonDown="TabBarBg_MouseLeftButtonDown">
+            <!-- 動的配置されるタブバーコンテナ (Panel.ZIndex=1 でTitleBarBgより上に表示しタブ操作を優先) -->
+            <Border x:Name="TabBarContainer" Panel.ZIndex="1" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Background="Transparent" Margin="0,0,220,0" MouseLeftButtonDown="TabBarBg_MouseLeftButtonDown">
                 <Grid>
                     <Border x:Name="DropHighlight" Background="#2a579a" Opacity="0" IsHitTestVisible="False"/>
+
+                    <!-- ドロップヒントテキスト（タブエリア内に表示） -->
+                    <TextBlock x:Name="DropHintText"
+                               Text="ここにウィンドウをドロップして追加"
+                               Foreground="Gray" FontSize="11"
+                               Margin="15,0,0,0" IsHitTestVisible="False"
+                               VerticalAlignment="Center" HorizontalAlignment="Left"/>
 
                     <!-- タブスクロール ◀ ボタン（タブ溢れ時のみ表示） -->
                     <Border x:Name="TabScrollLeft" Grid.Row="0"
@@ -66,7 +72,7 @@
                     </Border>
 
                     <!-- タブヘッダー Canvas -->
-                    <Canvas x:Name="TabBar" Grid.Row="0" Background="{x:Null}"
+                    <Canvas x:Name="TabBar" Grid.Row="0" Background="Transparent"
                             ClipToBounds="True"
                             MouseMove="TabBar_MouseMove"
                             MouseLeftButtonUp="TabBar_MouseLeftButtonUp"
@@ -77,23 +83,17 @@
             </Border>
 
             <!-- 共通タイトルバー（上部固定・ドラッグ可能・キャプションボタンあり） -->
-            <!-- Z-Order: Rendered LAST so it sits on top of TabBarContainer, ensuring buttons don't get hidden -->
             <Border x:Name="TitleBarBg" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Background="#2d2d30" MouseLeftButtonDown="TabBarBg_MouseLeftButtonDown">
                 <DockPanel LastChildFill="False">
-                    <!-- ヒントテキスト -->
-                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center" x:Name="HintPanel">
-                        <TextBlock x:Name="DropHintText" 
-                                   Text="ここにウィンドウをドロップして追加"
-                                   Foreground="Gray" FontSize="11"
-                                   Margin="15,0,0,0" IsHitTestVisible="False"
-                                   VerticalAlignment="Center"/>
+                    <!-- ヒントテキスト（レガシー: TitleBarBg側は非表示にするがC#コードの参照用に残す） -->
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center" x:Name="HintPanel" Visibility="Collapsed">
                     </StackPanel>
 
-                    <!-- カスタムキャプションボタン（右端） / [要件7] 新規ボタン追加 -->
+                    <!-- カスタムキャプションボタン（右端） -->
                     <StackPanel x:Name="CaptionButtons" DockPanel.Dock="Right"
                                 Orientation="Horizontal" VerticalAlignment="Stretch">
                         
-                        <!-- [要件7] すべてのウィンドウを集約するアイコン -->
+                        <!-- すべてのウィンドウを集約するアイコン -->
                         <Border x:Name="BtnAttachAll" Width="40" Cursor="Hand"
                                 Background="Transparent"
                                 MouseLeftButtonDown="CaptionBtn_Down"
@@ -104,7 +104,7 @@
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
 
-                        <!-- [要件7] 設定アイコン -->
+                        <!-- 設定アイコン -->
                         <Border x:Name="BtnSettings" Width="40" Cursor="Hand"
                                 Background="Transparent"
                                 MouseLeftButtonDown="CaptionBtn_Down"
